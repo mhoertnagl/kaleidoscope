@@ -4,7 +4,7 @@ mod lexer;
 use crate::lexer::Lexer;
 
 fn main() {
-  let lexer = Lexer::new("(19 + 23)");
+  let lexer = Lexer::new("def f(a) 19 + a");
 
   for tok in lexer {
     println!("{:?}", tok);

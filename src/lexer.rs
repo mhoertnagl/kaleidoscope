@@ -41,15 +41,19 @@ impl<'a> Lexer<'a> {
         break;
       }
     }
-
-    // self.read_while(' ', |d| d.is_whitespace());
   }
 
   fn tokenize_num_or_sym(&mut self, c: char) -> Token {
     if c.is_digit(10) {
-      Token::Num(self.tokenize_num(c))
-    } else {
-      Token::Id(self.tokenize_sym(c))
+      return Token::Num(self.tokenize_num(c));
+    }
+
+    let seq = self.tokenize_sym(c);
+
+    match seq.as_str() {
+      "let"    => Token::Def,
+      "extern" => Token::Extern,
+       _       => Token::Id(seq),
     }
   }
 
@@ -57,38 +61,30 @@ impl<'a> Lexer<'a> {
     self.read_while(c, |d| d.is_digit(10))
         .parse()
         .unwrap()
-
-    // let mut s = String::new();
-    // s.push(c);
-
-    // while let Some(d) = self.buf.peek() {
-    //   if d.is_digit(10) {
-    //     s.push(self.buf.next().unwrap());
-    //   } else {
-    //     break;
-    //   }
-    // }
-
-    // s.parse().unwrap()
   }
 
   fn tokenize_sym(&mut self, c: char) -> String {
-    self.read_while(c, |d| !(d.is_digit(10) || d.is_whitespace()))
+    self.read_while(c, |d| d.is_alphanumeric())
   }
 
   fn read_while(&mut self, c: char, f: fn(char) -> bool) -> String {
-    let mut s = String::new();
-    s.push(c);
+    let mut sequence = String::new();
+    sequence.push(c);
 
     while let Some(&d) = self.buf.peek() {
       if f(d) {
-        s.push(self.buf.next().unwrap());
+        sequence.push(d);
+        self.buf.next();
       } else {
         break;
       }
     }
 
-    s
+    sequence
+  }
+
+  fn op_token(&mut self, c: char) -> Token {
+    Token::Op(c.to_string())
   }
 }
 
@@ -105,15 +101,15 @@ impl<'a> Iterator for Lexer<'a> {
         ')' => Some(Token::RParens),
         ',' => Some(Token::Comma),
         ';' => Some(Token::Semicolon),
-        // '0'..='9' => Some(Token::Num(self.tokenize_num(c))),
-         x  => Some(self.tokenize_num_or_sym(x))
-        //  x  => if x.is_digit(10) {
-        //   Some(Token::Num(self.tokenize_num(x)))
-        //  } else {
-        //   Some(Token::Id(self.tokenize_sym(x)))
-        //  },
+        '+' => Some(self.op_token(c)),
+        '-' => Some(self.op_token(c)),
+         _  => Some(self.tokenize_num_or_sym(c)),
       },
       None => None,
     }
   }
+}
+
+fn is_sym(c: char) -> bool {
+  c.is_alphanumeric()
 }
