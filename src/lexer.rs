@@ -39,77 +39,49 @@ impl<'a> Lexer<'a> {
   // }
 
   fn consume_whitespace(&mut self) {
-    self.drop_while(|c| c.is_whitespace())
+    self.drop_while(char::is_whitespace)
   }
 
   fn consume_comments(&mut self) {
-    while let Some(&c) = self.buf.peek() {
-      if c == '#' {
-        self.consume_comment()
-      } else {
-        break
-      }
-    }
-  }
-
-  fn consume_comment(&mut self) {
-    if let Some(&c) = self.buf.peek() {
-      if c == '#' {
-        self.drop_while(|c| c != '\n' && c != '\r')
-      }
+    while let Some('#') = self.buf.peek() {
+      self.drop_while(is_not_newline);
       self.consume_whitespace()
     }
   }
 
   fn tokenize_num_or_sym(&mut self, c: char) -> Token {
-    if c.is_digit(10) || c == '.' {
+    if is_digit_or_dot(c) {
       return Token::Num(self.tokenize_num(c))
     }
-
-    let seq = self.tokenize_sym(c);
-
-    match seq.as_str() {
+    match self.tokenize_sym(c).as_str() {
       "def" => Token::Def,
       "end" => Token::End,
       "extern" => Token::Extern,
-      _ => Token::Id(seq),
+      seq => Token::Id(s!(seq)),
     }
   }
 
   fn tokenize_num(&mut self, c: char) -> f64 {
-    self
-      .read_while(c, |d| d.is_digit(10) || d == '.')
-      .parse()
-      .unwrap()
+    self.read_while(c, is_digit_or_dot).parse().unwrap()
   }
 
   fn tokenize_sym(&mut self, c: char) -> String {
-    self.read_while(c, |d| d.is_alphanumeric())
+    self.read_while(c, char::is_alphanumeric)
   }
 
   fn read_while(&mut self, c: char, f: fn(char) -> bool) -> String {
-    let mut sequence = String::new();
-    sequence.push(c);
-
-    while let Some(&d) = self.buf.peek() {
-      if f(d) {
-        sequence.push(d);
-        self.buf.next();
-      } else {
-        break
-      }
+    // let s = self.buf.take_while(|&c| f(c)).fold(String::new(), |mut s, c| { s.push(c); s });
+    let mut sequence = s!(c);
+    while let Some(&d) = self.buf.peek().filter(|&&c| f(c)) {
+      sequence.push(d);
+      self.buf.next();
     }
-
     sequence
   }
 
   fn drop_while(&mut self, f: fn(char) -> bool) {
-    while let Some(&c) = self.buf.peek() {
-      if f(c) {
-        self.buf.next();
-      } else {
-        break
-      }
+    while self.buf.peek().filter(|&&c| f(c)).is_some() {
+      self.buf.next();
     }
   }
 }
@@ -120,25 +92,29 @@ impl<'a> Iterator for Lexer<'a> {
   fn next(&mut self) -> Option<Self::Item> {
     self.consume_whitespace();
     self.consume_comments();
-
-    match self.buf.next() {
-      Some(c) => Some(match c {
-        '(' => Token::LParens,
-        ')' => Token::RParens,
-        ',' => Token::Comma,
-        ';' => Token::Semicolon,
-        '+' => Token::Op(s!(c)),
-        '-' => Token::Op(s!(c)),
-        _ => self.tokenize_num_or_sym(c),
-      }),
-      None => None,
-    }
+    self.buf.next().map(|c| match c {
+      '(' => Token::LParens,
+      ')' => Token::RParens,
+      ',' => Token::Comma,
+      ';' => Token::Semicolon,
+      '+' => Token::Op(s!(c)),
+      '-' => Token::Op(s!(c)),
+      _ => self.tokenize_num_or_sym(c),
+    })
   }
 }
 
-// fn is_sym(c: char) -> bool {
-//   c.is_alphanumeric()
-// }
+fn is_not_newline(c: char) -> bool {
+  is_newline(c) == false
+}
+
+fn is_newline(c: char) -> bool {
+  c == '\r' || c == '\n'
+}
+
+fn is_digit_or_dot(c: char) -> bool {
+  c.is_digit(10) || c == '.'
+}
 
 #[cfg(test)]
 mod test {
