@@ -1,0 +1,26 @@
+// http://lalrpop.github.io/lalrpop/tutorial/005_building_asts.html
+use std::str::FromStr;
+
+grammar;
+
+pub Expr: f64 = {
+    <l:Expr> "+" <r:Factor> => l + r,
+    <l:Expr> "-" <r:Factor> => l - r,
+    Factor,
+};
+
+Factor: f64 = {
+    <l:Factor> "*" <r:Term> => l * r,
+    <l:Factor> "/" <r:Term> => l / r,
+    Term,
+};
+
+Term: f64 = {
+    Num,
+    "(" <Expr> ")",
+};
+
+Num: f64 = {
+  r"-?[0-9]+" => f64::from_str(<>).unwrap(),
+  r"-?[0-9]*\.[0-9]*" => f64::from_str(<>).unwrap()
+};
