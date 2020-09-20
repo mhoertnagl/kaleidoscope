@@ -1,23 +1,75 @@
 // http://lalrpop.github.io/lalrpop/tutorial/005_building_asts.html
 use std::str::FromStr;
+use crate::ast::{
+  Module, Statement, Expr, Opcode
+};
 
 grammar;
 
-pub Expr: f64 = {
-    <l:Expr> "+" <r:Factor> => l + r,
-    <l:Expr> "-" <r:Factor> => l - r,
-    Factor,
+pub Module: Module = {
+  <ss:Statement*> => Module {
+    statements: ss,
+  },
 };
 
-Factor: f64 = {
-    <l:Factor> "*" <r:Term> => l * r,
-    <l:Factor> "/" <r:Term> => l / r,
-    Term,
+Statement: Statement = {
+  "let" <n:Id> "=" <e:Expr> => Statement::Let {
+    name: n,
+    expr: e,
+  },
+  "def" <n:Id> "(" ")" "begin" <ss:Statement*> "end" => Statement::Def {
+    name: n,
+    params: vec![],
+    statements: ss,
+  },
+  <n:Id> "=" <e:Expr> => Statement::Assign {
+    name: n,
+    expr: e,
+  },
+  "return" <e:Expr> => Statement::Return {
+    expr: e,
+  },
+}
+
+// Params: Vec<String> = {
+//   vec![<>]
+// }
+
+Expr: Expr = {
+  <l:Expr> <x:ExprOp> <r:Factor> => Expr::BinOp {
+    left: Box::new(l),
+    op: x,
+    right: Box::new(r),
+  },
+  Factor,
 };
 
-Term: f64 = {
-    Num,
-    "(" <Expr> ")",
+ExprOp: Opcode = {
+  "+" => Opcode::Add,
+  "-" => Opcode::Sub,
+};
+
+Factor: Expr = {
+  <l:Factor> <x:FactorOp> <r:Term> => Expr::BinOp {
+    left: Box::new(l),
+    op: x,
+    right: Box::new(r),
+  },
+  Term,
+};
+
+FactorOp: Opcode = {
+  "*" => Opcode::Mul,
+  "/" => Opcode::Div,
+};
+
+Term: Expr = {
+  Num => Expr::Num(<>),
+  "(" <Expr> ")",
+};
+
+Id: String = {
+  r"[a-zA-Z][a-zA-Z0-9]*" => String::from(<>),
 };
 
 Num: f64 = {
