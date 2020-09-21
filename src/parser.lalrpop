@@ -1,10 +1,31 @@
 // http://lalrpop.github.io/lalrpop/tutorial/005_building_asts.html
 use std::str::FromStr;
 use crate::ast::{
-  Module, Statement, Expr, Opcode
+  Module, Statement, Expr, Atom, Opcode
 };
 
 grammar;
+
+// #[inline]
+// Comma<T>: Vec<T> = {
+//   <v:(<T> ",")*> <e:T?> => match e {
+//       None => v,
+//       Some(e) => {
+//           let mut v = v;
+//           v.push(e);
+//           v
+//       }
+//   }
+// };
+
+#[inline]
+Comma<T>: Vec<T> = {
+    <i1: T> <i2:("," T)*> => {
+        let mut items = vec![i1];
+        items.extend(i2.into_iter().map(|e| e.1));
+        items
+    }
+};
 
 pub Module: Module = {
   <ss:Statement*> => Module {
@@ -13,34 +34,39 @@ pub Module: Module = {
 };
 
 Statement: Statement = {
-  "let" <n:Id> "=" <e:Expr> => Statement::Let {
+  "let" <n:Id> "=" <e:Expr> ";" => Statement::Let {
     name: n,
     expr: e,
   },
-  "def" <n:Id> "(" ")" "begin" <ss:Statement*> "end" => Statement::Def {
+  "def" <n:Id> "(" <ps:Comma<Id>?> ")" "begin" <ss:Statement*> "end" => Statement::Def {
     name: n,
-    params: vec![],
+    params: match ps {
+      None => vec![],
+      Some(x) => x,
+    },
     statements: ss,
   },
-  <n:Id> "=" <e:Expr> => Statement::Assign {
+  <n:Id> "=" <e:Expr> ";" => Statement::Assign {
     name: n,
     expr: e,
   },
-  "return" <e:Expr> => Statement::Return {
+  <e:Expr> ";" => Statement::Expr {
+    expr: e,
+  },
+  // "print" <e:Expr> => Statement::Expr {
+  //   expr: e,
+  // },
+  "return" <e:Expr> ";" => Statement::Return {
     expr: e,
   },
 }
 
-// Params: Vec<String> = {
-//   vec![<>]
-// }
-
-Expr: Expr = {
-  <l:Expr> <x:ExprOp> <r:Factor> => Expr::BinOp {
-    left: Box::new(l),
+Expr: Box<Expr> = {
+  <l:Expr> <x:ExprOp> <r:Factor> => Box::new(Expr::BinOp {
+    left: l,
     op: x,
-    right: Box::new(r),
-  },
+    right: r,
+  }),
   Factor,
 };
 
@@ -49,12 +75,12 @@ ExprOp: Opcode = {
   "-" => Opcode::Sub,
 };
 
-Factor: Expr = {
-  <l:Factor> <x:FactorOp> <r:Term> => Expr::BinOp {
-    left: Box::new(l),
+Factor: Box<Expr> = {
+  <l:Factor> <x:FactorOp> <r:Term> => Box::new(Expr::BinOp {
+    left: l,
     op: x,
-    right: Box::new(r),
-  },
+    right: r,
+  }),
   Term,
 };
 
@@ -63,9 +89,25 @@ FactorOp: Opcode = {
   "/" => Opcode::Div,
 };
 
-Term: Expr = {
-  Num => Expr::Num(<>),
-  "(" <Expr> ")",
+Term: Box<Expr> = {
+  <a:Atom> => Box::new(Expr::Atom(<>)),
+  FunCall => <>,
+  "(" <e:Expr> ")" => e,
+};
+
+FunCall: Box<Expr> = {
+  <n:Id> "(" <args:Comma<Expr>?> ")" => Box::new(Expr::FunCall {
+    name: n,
+    args: match args {
+      None => vec![],
+      Some(x) => x,
+    },
+  })
+}
+
+Atom: Atom = {
+  Num => Atom::Num(<>),
+  Id => Atom::Id(<>),
 };
 
 Id: String = {
