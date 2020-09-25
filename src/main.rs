@@ -4,6 +4,19 @@ mod ast;
 
 #[macro_use] extern crate lalrpop_util;
 
+use crate::ast::{
+  Module,
+  Statement,
+  LetStatement,
+  DefStatement,
+  AssignStatement,
+  ExprStatement,
+  ReturnStatement,
+  Expr,
+  Atom,
+  Opcode
+};
+
 fn main() {
   let prog = r"
     let a = 0;
@@ -25,9 +38,15 @@ lalrpop_mod!(pub parser);
 
 #[test]
 fn parser() {
-  let expr = parser::ModuleParser::new()
-    .parse("(1 + 2) * 4")
+  // let exp = Module {
+  //   statements: vec![
+  //     Statement::Expr(ExprStatement::new())
+  //   ]
+  // };
+
+  let act = parser::ModuleParser::new()
+    .parse("(1 + 2) * 4;")
     .unwrap();
 
-  assert_eq!(&format!("{:?}", expr), "((1 + 2) * 4)");
+  assert_eq!(&format!("{}", act), "((1 + 2) * 4);\n");
 }

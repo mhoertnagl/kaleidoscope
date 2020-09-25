@@ -1,7 +1,18 @@
 // http://lalrpop.github.io/lalrpop/tutorial/005_building_asts.html
 use std::str::FromStr;
 use crate::ast::{
-  Module, Statement, Expr, Atom, Opcode
+  Module,
+  Statement,
+  LetStatement,
+  DefStatement,
+  AssignStatement,
+  ExprStatement,
+  ReturnStatement,
+  Expr,
+  FunCallExpr,
+  BinOpExpr,
+  Atom,
+  Opcode
 };
 
 grammar;
@@ -34,39 +45,30 @@ pub Module: Module = {
 };
 
 Statement: Statement = {
-  "let" <n:Id> "=" <e:Expr> ";" => Statement::Let {
-    name: n,
-    expr: e,
-  },
-  "def" <n:Id> "(" <ps:Comma<Id>?> ")" "begin" <ss:Statement*> "end" => Statement::Def {
-    name: n,
-    params: match ps {
-      None => vec![],
-      Some(x) => x,
-    },
-    statements: ss,
-  },
-  <n:Id> "=" <e:Expr> ";" => Statement::Assign {
-    name: n,
-    expr: e,
-  },
-  <e:Expr> ";" => Statement::Expr {
-    expr: e,
-  },
+  "let" <n:Id> "=" <e:Expr> ";" =>
+    Statement::Let(LetStatement::new(n, e)),
+
+  "def" <n:Id> "(" <ps:Comma<Id>?> ")" "begin" <ss:Statement*> "end" =>
+    Statement::Def(DefStatement::new(n, ps, ss)),
+
+  <n:Id> "=" <e:Expr> ";" =>
+    Statement::Assign(AssignStatement::new(n, e)),
+
+  <e:Expr> ";" =>
+    Statement::Expr(ExprStatement::new(e)),
+
+  "return" <e:Expr> ";" =>
+    Statement::Return(ReturnStatement::new(e)),
+}
+
   // "print" <e:Expr> => Statement::Expr {
   //   expr: e,
   // },
-  "return" <e:Expr> ";" => Statement::Return {
-    expr: e,
-  },
-}
 
 Expr: Box<Expr> = {
-  <l:Expr> <x:ExprOp> <r:Factor> => Box::new(Expr::BinOp {
-    left: l,
-    op: x,
-    right: r,
-  }),
+  <l:Expr> <op:ExprOp> <r:Factor> =>
+    Box::new(Expr::BinOp(BinOpExpr::new(l, op, r))),
+
   Factor,
 };
 
@@ -76,11 +78,9 @@ ExprOp: Opcode = {
 };
 
 Factor: Box<Expr> = {
-  <l:Factor> <x:FactorOp> <r:Term> => Box::new(Expr::BinOp {
-    left: l,
-    op: x,
-    right: r,
-  }),
+  <l:Factor> <op:FactorOp> <r:Term> =>
+    Box::new(Expr::BinOp(BinOpExpr::new(l, op, r))),
+
   Term,
 };
 
@@ -96,14 +96,9 @@ Term: Box<Expr> = {
 };
 
 FunCall: Box<Expr> = {
-  <n:Id> "(" <args:Comma<Expr>?> ")" => Box::new(Expr::FunCall {
-    name: n,
-    args: match args {
-      None => vec![],
-      Some(x) => x,
-    },
-  })
-}
+  <n:Id> "(" <args:Comma<Expr>?> ")" =>
+    Box::new(Expr::FunCall(FunCallExpr::new(n, args))),
+};
 
 Atom: Atom = {
   Num => Atom::Num(<>),
